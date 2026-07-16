@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
+import { auth, googleProvider, db, signInWithPopup, signOut, onAuthStateChanged } from './firebase';
+import { collection, addDoc, getDocs, deleteDoc, doc, setDoc } from 'firebase/firestore';
 import {
   Dumbbell,
   Timer,
@@ -272,62 +274,46 @@ function App() {
   const myLogs = logs.filter(log => log.completedBy === user?.username);
   const currentUserStat = usersStats.find(u => u.username === user?.username) || { workoutCount: 0, lastWorkoutDate: null };
 
-  const handleGoogleLogin = async (email, name, picture) => {
+  const handleGoogleLogin = async () => {
     setAuthError('');
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/auth/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name, picture })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        localStorage.setItem('sb_user', JSON.stringify(data));
-        setUser(data);
-      } else {
-        setAuthError(data.error || 'שגיאה בהתחברות עם גוגל');
-      }
+      const result = await signInWithPopup(auth, googleProvider);
+      const u = result.user;
+      const userData = {
+        name: u.displayName || u.email.split('@')[0],
+        username: u.email,
+        email: u.email,
+        picture: u.photoURL
+      };
+      localStorage.setItem('sb_user', JSON.stringify(userData));
+      setUser(userData);
     } catch (err) {
-      setAuthError('שגיאה בחיבור לשרת לצורך התחברות עם גוגל');
+      console.error(err);
+      setAuthError('שגיאה בהתחברות עם גוגל');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleCredentialResponse = (response) => {
-    const payload = decodeJwt(response.credential);
-    if (payload) {
-      handleGoogleLogin(payload.email, payload.name, payload.picture);
-    } else {
-      setAuthError('נכשל פענוח חשבון הגוגל');
-    }
-  };
-
   useEffect(() => {
-    if (!user) {
-      /* global google */
-      if (typeof google !== 'undefined') {
-        try {
-          google.accounts.id.initialize({
-            client_id: "1098485292415-placeholder.apps.googleusercontent.com",
-            callback: handleGoogleCredentialResponse
-          });
-          setTimeout(() => {
-            const btnParent = document.getElementById("googleBtnParent");
-            if (btnParent) {
-              google.accounts.id.renderButton(
-                btnParent,
-                { theme: "outline", size: "large", width: 280, text: "signin_with" }
-              );
-            }
-          }, 150);
-        } catch (err) {
-          console.error("GSI init error:", err);
-        }
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const userData = {
+          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+          username: firebaseUser.email,
+          email: firebaseUser.email,
+          picture: firebaseUser.photoURL
+        };
+        localStorage.setItem('sb_user', JSON.stringify(userData));
+        setUser(userData);
+      } else {
+        localStorage.removeItem('sb_user');
+        setUser(null);
       }
-    }
-  }, [user]);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleAutoGenerateWorkout = async (type) => {
     setLoading(true);
@@ -358,15 +344,9 @@ function App() {
     };
 
     try {
-      const res = await fetch(`${API_URL}/api/workouts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        fetchData();
-        alert('אימון מומלץ נוצר בהצלחה!');
-      }
+      await addDoc(collection(db, 'templates'), payload);
+      fetchData();
+      alert('אימון מומלץ נוצר בהצלחה!');
     } catch (err) {
       console.error('Failed to generate template:', err);
     } finally {
@@ -418,35 +398,24 @@ function App() {
     if (!user) return;
     setLoading(true);
     try {
-      const [workoutsRes, logsRes, usersRes, statsRes] = await Promise.all([
-        fetch(`${API_URL}/api/workouts`),
-        fetch(`${API_URL}/api/logs`),
-        fetch(`${API_URL}/api/users`),
-        fetch(`${API_URL}/api/stats`)
-      ]);
+      const workoutsSnap = await getDocs(collection(db, 'templates'));
+      const workoutsData = workoutsSnap.docs.map(docVal => ({ id: docVal.id, ...docVal.data() }));
+      setWorkouts(workoutsData);
 
-      if (workoutsRes.ok) {
-        const workoutsData = await workoutsRes.json();
-        setWorkouts(workoutsData);
-      }
-      if (logsRes.ok) {
-        const logsData = await logsRes.json();
-        setLogs(logsData.sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt)));
-      }
-      if (usersRes.ok) {
-        const usersData = await usersRes.json();
-        setUsersStats(usersData);
-        const uShmouel = usersData.find(u => u.username === 'shmouel');
-        const uBeni = usersData.find(u => u.username === 'beni');
-        if (uShmouel) setEditNameShmouel(uShmouel.name);
-        if (uBeni) setEditNameBeni(uBeni.name);
-      }
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setUserStats(statsData.sort((a, b) => new Date(a.date) - new Date(b.date)));
-      }
+      const logsSnap = await getDocs(collection(db, 'logs'));
+      const logsData = logsSnap.docs.map(docVal => ({ id: docVal.id, ...docVal.data() }));
+      setLogs(logsData.sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt)));
+
+      const statsSnap = await getDocs(collection(db, 'userStats'));
+      const statsData = statsSnap.docs.map(docVal => ({ id: docVal.id, ...docVal.data() }));
+      setUserStats(statsData.sort((a, b) => new Date(a.date) - new Date(b.date)));
+
+      setUsersStats([
+        { username: 'shmouel', name: 'שמואל' },
+        { username: 'beni', name: 'בני' }
+      ]);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching data from Firestore:', error);
     } finally {
       setLoading(false);
     }
@@ -461,26 +430,15 @@ function App() {
   // Auth Functions
   const handleLogin = async (e) => {
     e.preventDefault();
-    setAuthError('');
-    try {
-      const res = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: authUsername, password: authPassword })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        localStorage.setItem('sb_user', JSON.stringify(data));
-        setUser(data);
-      } else {
-        setAuthError(data.error || 'שגיאת התחברות');
-      }
-    } catch (err) {
-      setAuthError('לא ניתן להתחבר לשרת. וודא שהשרת פועל.');
-    }
+    setAuthError('התחברות זו מושבתת. נא להשתמש בכפתור ההתחברות עם Google.');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error(err);
+    }
     localStorage.removeItem('sb_user');
     setUser(null);
     setActiveWorkout(null);
@@ -490,21 +448,14 @@ function App() {
   // Profile Edit Submission
   const handleUpdateProfileName = async (username, name) => {
     try {
-      const res = await fetch(`${API_URL}/api/users/profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, name })
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        if (user.username === username) {
-          const newUser = { ...user, name: updated.name };
-          localStorage.setItem('sb_user', JSON.stringify(newUser));
-          setUser(newUser);
-        }
-        fetchData();
-        alert('הפרופיל עודכן בהצלחה!');
+      await setDoc(doc(db, 'users', username), { name, username });
+      if (user.username === username) {
+        const newUser = { ...user, name };
+        localStorage.setItem('sb_user', JSON.stringify(newUser));
+        setUser(newUser);
       }
+      fetchData();
+      alert('הפרופיל עודכן בהצלחה!');
     } catch (err) {
       console.error('Failed to update profile name:', err);
     }
@@ -519,7 +470,6 @@ function App() {
     }
 
     const payload = {
-      id: editingTemplate ? editingTemplate.id : undefined,
       name: builderName,
       type: builderType,
       createdBy: user.username,
@@ -527,19 +477,17 @@ function App() {
     };
 
     try {
-      const res = await fetch(`${API_URL}/api/workouts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        fetchData();
-        setEditingTemplate(null);
-        setBuilderName('');
-        setBuilderType('workout');
-        setBuilderExercises([{ name: 'לחיצת חזה עם מוט (Bench Press)', sets: 3, reps: '10', weight: 60, restTime: 90 }]);
-        setCurrentTab('dashboard');
+      if (editingTemplate) {
+        await setDoc(doc(db, 'templates', editingTemplate.id), payload);
+      } else {
+        await addDoc(collection(db, 'templates'), payload);
       }
+      fetchData();
+      setEditingTemplate(null);
+      setBuilderName('');
+      setBuilderType('workout');
+      setBuilderExercises([{ name: 'לחיצת חזה עם מוט (Bench Press)', sets: 3, reps: '10', weight: 60, restTime: 90 }]);
+      setCurrentTab('dashboard');
     } catch (err) {
       console.error('Error saving workout:', err);
     }
@@ -548,12 +496,8 @@ function App() {
   const handleDeleteWorkoutTemplate = async (id, name) => {
     if (!confirm(`האם אתה בטוח שברצונך למחוק את האימון "${name}"?`)) return;
     try {
-      const res = await fetch(`${API_URL}/api/workouts/${id}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        fetchData();
-      }
+      await deleteDoc(doc(db, 'templates', id));
+      fetchData();
     } catch (err) {
       console.error('Error deleting workout:', err);
     }
@@ -889,35 +833,38 @@ function App() {
       date: dateObj.toISOString()
     };
 
+    const getLocalDateString = (d) => {
+      if (!d) return '';
+      const date = new Date(d);
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/stats`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const dateString = getLocalDateString(dateObj);
+      const docId = `${user.username}_${dateString}`;
+      await setDoc(doc(db, 'userStats', docId), payload);
 
-      if (res.ok) {
-        fetchData();
-        
-        if (preWorkoutWarmupId) {
-          const warmupTpl = workouts.find(w => w.id === preWorkoutWarmupId);
-          if (warmupTpl) {
-            setNextWorkoutTemplate(preWorkoutTemplate);
-            startWorkoutSession(warmupTpl);
-          } else {
-            startWorkoutSession(preWorkoutTemplate);
-          }
+      fetchData();
+      
+      if (preWorkoutWarmupId) {
+        const warmupTpl = workouts.find(w => w.id === preWorkoutWarmupId);
+        if (warmupTpl) {
+          setNextWorkoutTemplate(preWorkoutTemplate);
+          startWorkoutSession(warmupTpl);
         } else {
           startWorkoutSession(preWorkoutTemplate);
         }
-
-        setShowPreWorkoutModal(false);
-        setPreWorkoutTemplate(null);
-        setPreWorkoutWarmupId('');
       } else {
-        alert('שגיאה בשמירת נתוני גוף');
+        startWorkoutSession(preWorkoutTemplate);
       }
+
+      setShowPreWorkoutModal(false);
+      setPreWorkoutTemplate(null);
+      setPreWorkoutWarmupId('');
     } catch (err) {
       console.error('Error saving stats:', err);
       if (preWorkoutWarmupId) {
@@ -960,23 +907,26 @@ function App() {
       date: dateObj.toISOString()
     };
 
+    const getLocalDateString = (d) => {
+      if (!d) return '';
+      const date = new Date(d);
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/stats`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const dateString = getLocalDateString(dateObj);
+      const docId = `${user.username}_${dateString}`;
+      await setDoc(doc(db, 'userStats', docId), payload);
 
-      if (res.ok) {
-        fetchData();
-        setIsEditingCalendarMetrics(false);
-      } else {
-        alert('שגיאה בשמירת נתוני גוף');
-      }
+      fetchData();
+      setIsEditingCalendarMetrics(false);
     } catch (err) {
-      console.error('Error saving stats:', err);
-      alert('נכשל החיבור לשרת');
+      console.error('Error saving stats to Firestore:', err);
+      alert('שגיאה בשמירת נתוני גוף');
     } finally {
       setLoading(false);
     }
@@ -1184,10 +1134,11 @@ function App() {
     clearInterval(restTimerIntervalRef.current);
 
     const payload = {
-      workoutId: activeWorkout.templateId,
+      workoutId: activeWorkout.templateId || 'custom',
       name: activeWorkout.name,
       completedBy: user.username,
       duration: activeWorkout.duration,
+      completedAt: new Date().toISOString(),
       exercises: activeWorkout.exercises.map(ex => ({
         name: ex.name,
         isSuperset: !!ex.isSuperset,
@@ -1208,34 +1159,25 @@ function App() {
     };
 
     try {
-      const res = await fetch(`${API_URL}/api/logs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        fetchData();
-        setActiveWorkout(null);
-        
-        const queuedTemplate = nextWorkoutTemplate;
-        setNextWorkoutTemplate(null);
-        if (queuedTemplate) {
-          setPreWorkoutTemplate(queuedTemplate);
-          setPreWorkoutWarmupId('');
-          // Initialize metrics fields for main workout modal prompt
-          setPreWorkoutWeight('');
-          setPreWorkoutBodyFat('');
-          setShowPreWorkoutModal(true);
-          setCurrentTab('dashboard');
-        } else {
-          setCurrentTab('history');
-        }
+      await addDoc(collection(db, 'logs'), payload);
+      fetchData();
+      setActiveWorkout(null);
+      
+      const queuedTemplate = nextWorkoutTemplate;
+      setNextWorkoutTemplate(null);
+      if (queuedTemplate) {
+        setPreWorkoutTemplate(queuedTemplate);
+        setPreWorkoutWarmupId('');
+        setPreWorkoutWeight('');
+        setPreWorkoutBodyFat('');
+        setShowPreWorkoutModal(true);
+        setCurrentTab('dashboard');
       } else {
-        alert('שגיאה בשמירת יומן האימון');
+        setCurrentTab('history');
       }
     } catch (err) {
-      console.error('Error logging workout:', err);
-      alert('נכשל החיבור לשרת לסנכרון. האימון הושלם מקומית.');
+      console.error('Error logging workout to Firestore:', err);
+      alert('שגיאה בשמירת יומן האימון בענן.');
       setActiveWorkout(null);
       
       const queuedTemplate = nextWorkoutTemplate;
@@ -1265,14 +1207,10 @@ function App() {
   const handleDeleteLog = async (id, name) => {
     if (!confirm(`האם למחוק אימון מתועד זה מיומן האימונים?`)) return;
     try {
-      const res = await fetch(`${API_URL}/api/logs/${id}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        fetchData();
-      }
+      await deleteDoc(doc(db, 'logs', id));
+      fetchData();
     } catch (err) {
-      console.error('Error deleting log:', err);
+      console.error('Error deleting log from Firestore:', err);
     }
   };
 

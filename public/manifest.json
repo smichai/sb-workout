@@ -1,0 +1,16 @@
+{
+  "short_name": "SB Sports",
+  "name": "SB Sports Workout Tracker",
+  "icons": [
+    {
+      "src": "/logo.jpg",
+      "type": "image/jpeg",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
+  "display": "standalone",
+  "orientation": "portrait"
+}

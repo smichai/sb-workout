@@ -258,6 +258,8 @@ function App() {
   const [calendarEditSleep, setCalendarEditSleep] = useState(4);
   const [calendarEditEnergy, setCalendarEditEnergy] = useState(4);
   const [isEditingCalendarMetrics, setIsEditingCalendarMetrics] = useState(false);
+  const [isAdminView, setIsAdminView] = useState(false);
+  const [adminUsers, setAdminUsers] = useState([]);
   const [preWorkoutSleepStart, setPreWorkoutSleepStart] = useState('23:00');
   const [preWorkoutSleepEnd, setPreWorkoutSleepEnd] = useState('07:00');
   const [calendarEditSleepStart, setCalendarEditSleepStart] = useState('23:00');
@@ -307,12 +309,31 @@ function App() {
         };
         localStorage.setItem('sb_user', JSON.stringify(userData));
         setUser(userData);
+        
+        setDoc(doc(db, 'users', firebaseUser.email), {
+          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+          email: firebaseUser.email,
+          picture: firebaseUser.photoURL || '',
+          lastLogin: new Date().toISOString()
+        }, { merge: true }).catch(err => console.error("Firestore user sync error:", err));
       } else {
         localStorage.removeItem('sb_user');
         setUser(null);
       }
     });
-    return () => unsubscribe();
+
+    const handleUrlChange = () => {
+      const isHashAdmin = window.location.hash === '#admin';
+      const isPathAdmin = window.location.pathname === '/admin';
+      setIsAdminView(isHashAdmin || isPathAdmin);
+    };
+    handleUrlChange();
+    window.addEventListener('hashchange', handleUrlChange);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
   }, []);
 
   const handleAutoGenerateWorkout = async (type) => {
@@ -409,6 +430,10 @@ function App() {
       const statsSnap = await getDocs(collection(db, 'userStats'));
       const statsData = statsSnap.docs.map(docVal => ({ id: docVal.id, ...docVal.data() }));
       setUserStats(statsData.sort((a, b) => new Date(a.date) - new Date(b.date)));
+
+      const usersDbSnap = await getDocs(collection(db, 'users'));
+      const usersList = usersDbSnap.docs.map(docVal => ({ id: docVal.id, ...docVal.data() }));
+      setAdminUsers(usersList);
 
       setUsersStats([
         { username: 'shmouel', name: 'שמואל' },
@@ -1327,6 +1352,102 @@ function App() {
           </div>
 
           {authError && <p style={{ color: 'var(--sport-orange)', marginTop: 16, fontSize: '0.9rem' }}>{authError}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  // Admin Panel Subscreen
+  if (isAdminView) {
+    return (
+      <div className="app-container" style={{ padding: '24px 16px', maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30, borderBottom: '1px solid var(--border-color)', paddingBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <img src="/logo.jpg" alt="Logo" style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid var(--sport-volt)' }} />
+            <div>
+              <h1 style={{ fontSize: '1.4rem', fontWeight: '900', color: '#fff', margin: 0 }}>פאנל מנהלים</h1>
+              <span style={{ fontSize: '0.8rem', color: 'var(--sport-volt)', fontWeight: 'bold' }}>SB SPORTS ADMIN</span>
+            </div>
+          </div>
+          <button 
+            onClick={() => {
+              window.location.hash = '';
+              setIsAdminView(false);
+            }}
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid var(--border-color)',
+              color: '#fff',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '0.85rem'
+            }}
+          >
+            חזור לאימונים
+          </button>
+        </div>
+
+        <div className="glass-panel" style={{ padding: '20px', borderRadius: '20px', background: 'rgba(255,255,255,0.02)' }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: 20 }}>
+            משתמשים רשומים ({adminUsers.length})
+          </h2>
+
+          {adminUsers.length === 0 ? (
+            <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem', padding: '20px 0' }}>
+              אין עדיין משתמשים רשומים במערכת
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {adminUsers.map((u) => {
+                const userLogsCount = logs.filter(l => l.completedBy === u.email).length;
+                return (
+                  <div 
+                    key={u.id || u.email}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '16px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '16px',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {u.picture ? (
+                        <img 
+                          src={u.picture} 
+                          alt={u.name} 
+                          style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }} 
+                        />
+                      ) : (
+                        <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--sport-orange)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#fff' }}>
+                          {u.name ? u.name[0] : '?'}
+                        </div>
+                      )}
+                      <div>
+                        <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.95rem' }}>{u.name}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{u.email}</div>
+                        {u.lastLogin && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                            חיבור אחרון: {new Date(u.lastLogin).toLocaleString('he-IL')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div style={{ textAlign: 'left' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>אימונים</span>
+                      <span style={{ fontSize: '1.2rem', fontWeight: '900', color: 'var(--sport-volt)' }}>{userLogsCount}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );

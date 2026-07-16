@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
-import { auth, googleProvider, db, signInWithPopup, signOut, onAuthStateChanged } from './firebase';
+import { auth, googleProvider, db, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from './firebase';
 import { collection, addDoc, getDocs, deleteDoc, doc, setDoc } from 'firebase/firestore';
 import {
   Dumbbell,
@@ -283,16 +283,21 @@ function App() {
     setAuthError('');
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const u = result.user;
-      const userData = {
-        name: u.displayName || u.email.split('@')[0],
-        username: u.email,
-        email: u.email,
-        picture: u.photoURL
-      };
-      localStorage.setItem('sb_user', JSON.stringify(userData));
-      setUser(userData);
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        await signInWithRedirect(auth, googleProvider);
+      } else {
+        const result = await signInWithPopup(auth, googleProvider);
+        const u = result.user;
+        const userData = {
+          name: u.displayName || u.email.split('@')[0],
+          username: u.email,
+          email: u.email,
+          picture: u.photoURL
+        };
+        localStorage.setItem('sb_user', JSON.stringify(userData));
+        setUser(userData);
+      }
     } catch (err) {
       console.error(err);
       setAuthError('שגיאה בהתחברות עם גוגל');
@@ -302,6 +307,31 @@ function App() {
   };
 
   useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          const u = result.user;
+          const userData = {
+            name: u.displayName || u.email.split('@')[0],
+            username: u.email,
+            email: u.email,
+            picture: u.photoURL
+          };
+          localStorage.setItem('sb_user', JSON.stringify(userData));
+          setUser(userData);
+          
+          setDoc(doc(db, 'users', u.email), {
+            name: u.displayName || u.email.split('@')[0],
+            email: u.email,
+            picture: u.photoURL || '',
+            lastLogin: new Date().toISOString()
+          }, { merge: true }).catch(err => console.error("Firestore user sync error:", err));
+        }
+      })
+      .catch((err) => {
+        console.error("Redirect login result error:", err);
+      });
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         const userData = {

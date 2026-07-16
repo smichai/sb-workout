@@ -1,0 +1,173 @@
+{
+  "users": [
+    {
+      "username": "shmouel",
+      "password": "123",
+      "name": "שמואל",
+      "role": "מתאמן א"
+    },
+    {
+      "username": "beni",
+      "password": "123",
+      "name": "בני",
+      "role": "מתאמן ב"
+    },
+    {
+      "username": "shmouel@gmail.com",
+      "name": "שמואל",
+      "email": "shmouel@gmail.com",
+      "picture": "https://lh3.googleusercontent.com/a/default-user",
+      "role": "מתאמן",
+      "password": ""
+    }
+  ],
+  "workouts": [
+    {
+      "id": "w_1",
+      "name": "אימון דחיפה (Push) - חזה, כתפיים ויד אחורית",
+      "createdBy": "shmouel",
+      "createdAt": "2026-07-16T00:00:00.000Z",
+      "exercises": [
+        {
+          "id": "e_1",
+          "name": "לחיצת חזה עם מוט (Bench Press)",
+          "sets": 4,
+          "reps": "8-12",
+          "weight": 60,
+          "restTime": 90
+        },
+        {
+          "id": "e_2",
+          "name": "לחיצת כתפיים עם משקולות (Shoulder Press)",
+          "sets": 3,
+          "reps": "10",
+          "weight": 16,
+          "restTime": 75
+        },
+        {
+          "id": "e_3",
+          "name": "מקבילים (Dips)",
+          "sets": 3,
+          "reps": "12",
+          "weight": 0,
+          "restTime": 60
+        },
+        {
+          "id": "e_4",
+          "name": "פשיטת מרפקים בפולי (Tricep Pushdown)",
+          "sets": 3,
+          "reps": "12-15",
+          "weight": 25,
+          "restTime": 60
+        }
+      ]
+    },
+    {
+      "id": "w_2",
+      "name": "אימון משיכה (Pull) - גב ויד קדמית",
+      "createdBy": "partner",
+      "createdAt": "2026-07-16T00:00:00.000Z",
+      "exercises": [
+        {
+          "id": "e_5",
+          "name": "מתח (Pull-ups)",
+          "sets": 4,
+          "reps": "8",
+          "weight": 0,
+          "restTime": 90
+        },
+        {
+          "id": "e_6",
+          "name": "חתירה בפולי תחתון (Seated Cable Row)",
+          "sets": 3,
+          "reps": "10-12",
+          "weight": 50,
+          "restTime": 75
+        },
+        {
+          "id": "e_7",
+          "name": "כפיפת מרפקים עם משקולות (Bicep Curls)",
+          "sets": 3,
+          "reps": "12",
+          "weight": 12,
+          "restTime": 60
+        }
+      ]
+    },
+    {
+      "id": "w_1784183537304",
+      "name": "ל",
+      "createdBy": "shmouel@gmail.com",
+      "createdAt": "2026-07-16T06:32:17.304Z",
+      "exercises": [
+        {
+          "id": "e_1784183537304_0",
+          "name": "לחיצת חזה עם מוט (Bench Press)",
+          "sets": 3,
+          "reps": "10",
+          "weight": 60,
+          "restTime": 90
+        }
+      ]
+    },
+    {
+      "id": "w_1784235296338",
+      "name": "גג",
+      "type": "workout",
+      "createdBy": "shmouel@gmail.com",
+      "createdAt": "2026-07-16T20:54:56.338Z",
+      "exercises": [
+        {
+          "id": "e_1784235296338_0",
+          "name": "סופר-סט: ככ + ככ",
+          "type": "workout",
+          "isSuperset": true,
+          "subExercises": [
+            {
+              "name": "ככ",
+              "reps": "10",
+              "weight": 60
+            },
+            {
+              "name": "ככ",
+              "reps": "10",
+              "weight": 60
+            }
+          ],
+          "sets": 3,
+          "reps": "10",
+          "weight": 60,
+          "restTime": 90,
+          "setsDetail": []
+        }
+      ]
+    }
+  ],
+  "logs": [],
+  "stats": [
+    {
+      "id": "stat_1784234740811",
+      "username": "shmouel@gmail.com",
+      "date": "2026-07-16T20:45:40.799Z",
+      "hebrewDate": "ב׳ 04:45 PM",
+      "weight": 3,
+      "bodyFat": 33,
+      "sleepQuality": 4,
+      "energyLevel": 4,
+      "sleepStart": "23:00",
+      "sleepEnd": "07:00"
+    },
+    {
+      "id": "stat_1784235304291",
+      "username": "shmouel@gmail.com",
+      "date": "2026-07-16T20:55:04.288Z",
+      "hebrewDate": "ב׳ 04:55 PM",
+      "weight": 232,
+      "bodyFat": null,
+      "sleepQuality": 4,
+      "energyLevel": 4,
+      "sleepStart": "23:00",
+      "sleepEnd": "07:00"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=Rubik:ital,wght@0,300..900;1,300..900&display=swap');
+
+:root {
+  /* Minimalist Premium Dark Theme */
+  --bg-primary: #000000;
+  --bg-secondary: #08090c;
+  --bg-card: #12141c;
+  --bg-input: #181b26;
+  
+  /* Vibrant Clean Sports Accent Colors */
+  --sport-volt: #ccff00; /* Neon Volt Green */
+  --sport-orange: #ff3b30; /* Clean Red/Orange */
+  --sport-blue: #007aff; /* Clean iOS Blue */
+  
+  --text-primary: #ffffff;
+  --text-secondary: #8e8e93;
+  --text-muted: #48484a;
+  
+  --border-color: rgba(255, 255, 255, 0.05);
+  --border-focus: rgba(204, 255, 0, 0.35);
+  
+  --font-hebrew: 'Rubik', sans-serif;
+  --font-latin: 'Outfit', sans-serif;
+  
+  font-family: var(--font-hebrew);
+  color-scheme: dark;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  
+  direction: rtl; /* RTL Hebrew layout */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-color: var(--bg-primary);
+  /* Smooth radial background glow in the center */
+  background-image: 
+    radial-gradient(circle at 50% 20%, rgba(204, 255, 0, 0.04) 0%, transparent 60%),
+    radial-gradient(circle at 10% 80%, rgba(0, 122, 255, 0.02) 0%, transparent 50%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}

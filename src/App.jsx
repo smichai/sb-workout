@@ -260,6 +260,9 @@ function App() {
   const [isEditingCalendarMetrics, setIsEditingCalendarMetrics] = useState(false);
   const [isAdminView, setIsAdminView] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(sessionStorage.getItem('sb_admin_unlocked') === 'true');
+  const [adminInputCode, setAdminInputCode] = useState('');
+  const [adminCodeError, setAdminCodeError] = useState(false);
   const [preWorkoutSleepStart, setPreWorkoutSleepStart] = useState('23:00');
   const [preWorkoutSleepEnd, setPreWorkoutSleepEnd] = useState('07:00');
   const [calendarEditSleepStart, setCalendarEditSleepStart] = useState('23:00');
@@ -1359,6 +1362,92 @@ function App() {
 
   // Admin Panel Subscreen
   if (isAdminView) {
+    if (!isAdminUnlocked) {
+      const handleVerifyCode = (e) => {
+        e.preventDefault();
+        if (adminInputCode === '327548723') {
+          setIsAdminUnlocked(true);
+          sessionStorage.setItem('sb_admin_unlocked', 'true');
+          setAdminCodeError(false);
+          setAdminInputCode('');
+        } else {
+          setAdminCodeError(true);
+        }
+      };
+
+      return (
+        <div className="app-container" style={{ padding: '40px 16px', maxWidth: '400px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+          <div className="glass-panel" style={{ padding: '30px 24px', borderRadius: '24px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', width: '100%', textAlign: 'center' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(255, 90, 95, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <Lock size={32} style={{ color: 'var(--sport-orange)' }} />
+            </div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: '900', color: '#fff', marginBottom: 8 }}>אזור מוגן</h1>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 24 }}>הזן את קוד הגישה כדי להיכנס לפאנל המנהלים</p>
+            
+            <form onSubmit={handleVerifyCode} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <input 
+                type="password"
+                value={adminInputCode}
+                onChange={(e) => setAdminInputCode(e.target.value)}
+                placeholder="קוד גישה..."
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: adminCodeError ? '1px solid var(--sport-orange)' : '1px solid var(--border-color)',
+                  color: '#fff',
+                  fontSize: '1.1rem',
+                  textAlign: 'center',
+                  outline: 'none',
+                  letterSpacing: '4px'
+                }}
+              />
+              
+              {adminCodeError && (
+                <p style={{ color: 'var(--sport-orange)', fontSize: '0.85rem', margin: 0 }}>קוד גישה שגוי. נסה שנית.</p>
+              )}
+
+              <button 
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: 'var(--sport-volt)',
+                  color: '#121212',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                אישור כניסה
+              </button>
+            </form>
+
+            <button 
+              onClick={() => {
+                window.location.hash = '';
+                setIsAdminView(false);
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                marginTop: 20,
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                textDecoration: 'underline'
+              }}
+            >
+              ביטול וחזרה
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="app-container" style={{ padding: '24px 16px', maxWidth: '600px', margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30, borderBottom: '1px solid var(--border-color)', paddingBottom: 16 }}>

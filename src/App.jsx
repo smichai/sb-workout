@@ -325,7 +325,11 @@ function App() {
             email: u.email,
             picture: u.photoURL || '',
             lastLogin: new Date().toISOString()
-          }, { merge: true }).catch(err => console.error("Firestore user sync error:", err));
+          }, { merge: true })
+          .then(() => {
+            fetchData();
+          })
+          .catch(err => console.error("Firestore user sync error:", err));
         }
       })
       .catch((err) => {
@@ -348,7 +352,11 @@ function App() {
           email: firebaseUser.email,
           picture: firebaseUser.photoURL || '',
           lastLogin: new Date().toISOString()
-        }, { merge: true }).catch(err => console.error("Firestore user sync error:", err));
+        }, { merge: true })
+        .then(() => {
+          fetchData();
+        })
+        .catch(err => console.error("Firestore user sync error:", err));
       } else {
         localStorage.removeItem('sb_user');
         setUser(null);

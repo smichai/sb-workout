@@ -149,18 +149,27 @@ body::before {
   max-width: 1000px;
   width: 100%;
   margin: 0 auto;
-  padding: 24px 16px 60px;
+  padding: 85px 16px 60px;
   position: relative;
   z-index: 1;
 }
 
 /* Top App Header */
 .app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0 24px;
-  margin-bottom: 8px;
+  padding: 12px 24px;
+  background: rgba(13, 13, 15, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-color);
+  z-index: 998;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .logo-section {
@@ -1095,7 +1104,7 @@ body::before {
 /* Mobile responsive alignments */
 @media (max-width: 600px) {
   .app-container {
-    padding: 12px 12px calc(90px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 80px 12px calc(90px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .nav-tabs {
@@ -1136,11 +1145,19 @@ body::before {
   }
 
   .app-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 4px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border-color);
+    background: rgba(13, 13, 15, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 998;
   }
 
   .logo-section {

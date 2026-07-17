@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
-import { auth, googleProvider, db, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from './firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { auth, googleProvider, db, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from './firebase';
+import { collection, addDoc, getDocs, getDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
 import {
   Dumbbell,
   Timer,
@@ -203,8 +203,10 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
   const [authError, setAuthError] = useState('');
-  const [authUsername, setAuthUsername] = useState('shmouel');
-  const [authPassword, setAuthPassword] = useState('123');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authMode, setAuthMode] = useState('login');
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [loading, setLoading] = useState(false);
 
@@ -336,27 +338,34 @@ function App() {
         console.error("Redirect login result error:", err);
       });
 
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        let displayName = firebaseUser.displayName || firebaseUser.email.split('@')[0];
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.email));
+          if (userDoc.exists() && userDoc.data().name) {
+            displayName = userDoc.data().name;
+          } else {
+            await setDoc(doc(db, 'users', firebaseUser.email), {
+              name: displayName,
+              email: firebaseUser.email,
+              picture: firebaseUser.photoURL || '',
+              lastLogin: new Date().toISOString()
+            }, { merge: true });
+          }
+        } catch (e) {
+          console.error("Error loading user profile:", e);
+        }
+
         const userData = {
-          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+          name: displayName,
           username: firebaseUser.email,
           email: firebaseUser.email,
-          picture: firebaseUser.photoURL
+          picture: firebaseUser.photoURL || ''
         };
         localStorage.setItem('sb_user', JSON.stringify(userData));
         setUser(userData);
-        
-        setDoc(doc(db, 'users', firebaseUser.email), {
-          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-          email: firebaseUser.email,
-          picture: firebaseUser.photoURL || '',
-          lastLogin: new Date().toISOString()
-        }, { merge: true })
-        .then(() => {
-          fetchData();
-        })
-        .catch(err => console.error("Firestore user sync error:", err));
+        fetchData();
       } else {
         localStorage.removeItem('sb_user');
         setUser(null);
@@ -496,7 +505,78 @@ function App() {
   // Auth Functions
   const handleLogin = async (e) => {
     e.preventDefault();
-    setAuthError('התחברות זו מושבתת. נא להשתמש בכפתור ההתחברות עם Google.');
+    setAuthError('');
+    if (!authEmail || !authPassword) {
+      setAuthError('נא להזין אימייל וסיסמה');
+      return;
+    }
+    if (authMode === 'signup' && !authName.trim()) {
+      setAuthError('נא להזין שם מלא עבור ההרשמה');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      if (authMode === 'login') {
+        const result = await signInWithEmailAndPassword(auth, authEmail, authPassword);
+        const u = result.user;
+        let displayName = u.displayName || u.email.split('@')[0];
+        
+        // Load custom profile name from Firestore if exists
+        try {
+          const userDoc = await getDoc(doc(db, 'users', u.email));
+          if (userDoc.exists() && userDoc.data().name) {
+            displayName = userDoc.data().name;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+
+        const userData = {
+          name: displayName,
+          username: u.email,
+          email: u.email,
+          picture: ''
+        };
+        localStorage.setItem('sb_user', JSON.stringify(userData));
+        setUser(userData);
+      } else {
+        const result = await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+        const u = result.user;
+        const userData = {
+          name: authName.trim(),
+          username: u.email,
+          email: u.email,
+          picture: ''
+        };
+        localStorage.setItem('sb_user', JSON.stringify(userData));
+        setUser(userData);
+        
+        await setDoc(doc(db, 'users', u.email), {
+          name: authName.trim(),
+          email: u.email,
+          picture: '',
+          lastLogin: new Date().toISOString()
+        }, { merge: true });
+        
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+      if (err.code === 'auth/email-already-in-use') {
+        setAuthError('כתובת אימייל זו כבר רשומה במערכת');
+      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
+        setAuthError('אימייל או סיסמה שגויים');
+      } else if (err.code === 'auth/weak-password') {
+        setAuthError('הסיסמה חלשה מדי (לפחות 6 תווים)');
+      } else if (err.code === 'auth/invalid-email') {
+        setAuthError('כתובת אימייל לא תקינה');
+      } else {
+        setAuthError('שגיאה בתהליך ההתחברות/הרשמה');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -1337,62 +1417,142 @@ function App() {
 
   // --- RENDERING SUBSCREENS ---
 
-  // Auth Screen (Login)
+  // Auth Screen (Login / Register)
   if (!user) {
     return (
-      <div className="auth-page">
-        <div className="auth-card glass-panel">
-          <div className="auth-logo">
-            <img src="/logo.jpg" alt="SB Sports Logo" className="logo-img" />
+      <div className="auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '16px' }}>
+        <div className="auth-card glass-panel" style={{ width: '100%', maxWidth: '380px', padding: '32px 24px', borderRadius: '24px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+          <div className="auth-logo" style={{ marginBottom: 20 }}>
+            <img src="/logo.jpg" alt="SB Sports Logo" className="logo-img" style={{ width: 80, height: 80, borderRadius: '50%', border: '2px solid var(--sport-volt)', objectFit: 'cover' }} />
           </div>
-          <h1 className="auth-title text-gold-gradient">SB SPORTS</h1>
-          <p className="auth-subtitle" style={{ marginBottom: 24 }}>התחברות מאובטחת לחשבון האישי שלך</p>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, width: '100%' }}>
-              <div id="googleBtnParent" style={{ width: '100%', display: 'none', justifyContent: 'center' }}></div>
-              
-              <button 
-                type="button" 
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 12,
-                  width: '280px',
-                  height: '44px',
-                  background: '#ffffff',
-                  border: 'none',
-                  borderRadius: '22px',
-                  color: '#1f1f1f',
-                  fontWeight: 'bold',
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  transition: 'all 0.2s ease',
-                  outline: 'none'
-                }}
-                onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)'; }}
-                onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }}
-                onClick={() => {
-                  handleGoogleLogin("shmouel@gmail.com", "שמואל", "https://lh3.googleusercontent.com/a/default-user");
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 18 18" style={{ minWidth: '20px' }}>
-                  <path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.47h4.84c-.21 1.12-.84 2.07-1.8 2.71v2.24h2.91c1.7-1.56 2.69-3.86 2.69-6.58z" />
-                  <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.24c-.8.54-1.84.87-3.05.87-2.34 0-4.33-1.58-5.03-3.7H.95v2.3C2.43 15.89 5.5 18 9 18z" />
-                  <path fill="#FBBC05" d="M3.97 10.75c-.18-.54-.28-1.1-.28-1.75s.1-1.21.28-1.75V4.95H.95A8.96 8.96 0 0 0 0 9c0 1.45.35 2.82.95 4.05l3.02-2.3z" />
-                  <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59C13.46.8 11.43 0 9 0 5.5 0 2.43 2.11.95 5.09l3.02 2.3c.7-2.12 2.69-3.81 5.03-3.81z" />
-                </svg>
-                <span>התחבר באמצעות Google</span>
-              </button>
-            </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 12, lineHeight: '140%', textAlign: 'center' }}>
-              לחץ על כפתור ההתחברות כדי להיכנס באופן מיידי לחשבון האישי שלך.
-            </p>
-          </div>
+          <h1 className="auth-title text-gold-gradient" style={{ fontSize: '1.8rem', fontWeight: '900', margin: '0 0 4px' }}>SB SPORTS</h1>
+          <p className="auth-subtitle" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 28 }}>
+            {authMode === 'login' ? 'התחברות לחשבון האימונים האישי שלך' : 'יצירת חשבון אימון חדש'}
+          </p>
 
-          {authError && <p style={{ color: 'var(--sport-orange)', marginTop: 16, fontSize: '0.9rem' }}>{authError}</p>}
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {authMode === 'signup' && (
+              <div style={{ textAlign: 'right' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 'bold' }}>שם מלא</label>
+                <input 
+                  type="text"
+                  value={authName}
+                  onChange={(e) => setAuthName(e.target.value)}
+                  placeholder="ישראל ישראלי"
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid var(--border-color)',
+                    color: '#fff',
+                    outline: 'none',
+                    fontSize: '0.95rem'
+                  }}
+                  required
+                />
+              </div>
+            )}
+
+            <div style={{ textAlign: 'right' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 'bold' }}>כתובת אימייל</label>
+              <input 
+                type="email"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                placeholder="name@example.com"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid var(--border-color)',
+                  color: '#fff',
+                  outline: 'none',
+                  fontSize: '0.95rem',
+                  textAlign: 'left',
+                  direction: 'ltr'
+                }}
+                required
+              />
+            </div>
+
+            <div style={{ textAlign: 'right' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 'bold' }}>סיסמה</label>
+              <input 
+                type="password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                placeholder="••••••"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid var(--border-color)',
+                  color: '#fff',
+                  outline: 'none',
+                  fontSize: '0.95rem',
+                  textAlign: 'left',
+                  direction: 'ltr'
+                }}
+                required
+              />
+            </div>
+
+            {authError && (
+              <p style={{ color: 'var(--sport-orange)', fontSize: '0.85rem', margin: '4px 0 0', textAlign: 'right' }}>
+                ⚠️ {authError}
+              </p>
+            )}
+
+            <button 
+              type="submit" 
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '14px',
+                background: 'var(--sport-volt)',
+                color: '#121212',
+                fontWeight: 'bold',
+                fontSize: '1rem',
+                border: 'none',
+                cursor: 'pointer',
+                marginTop: 8,
+                transition: 'all 0.2s ease',
+                opacity: loading ? 0.7 : 1
+              }}
+            >
+              {loading ? 'טוען...' : authMode === 'login' ? 'התחברות' : 'הרשמה ויצירת חשבון'}
+            </button>
+          </form>
+
+          <div style={{ marginTop: 24, fontSize: '0.85rem' }}>
+            {authMode === 'login' ? (
+              <span style={{ color: 'var(--text-secondary)' }}>
+                אין לך חשבון?{' '}
+                <button 
+                  type="button" 
+                  onClick={() => { setAuthMode('signup'); setAuthError(''); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--sport-volt)', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline', padding: 0 }}
+                >
+                  הרשם כאן
+                </button>
+              </span>
+            ) : (
+              <span style={{ color: 'var(--text-secondary)' }}>
+                כבר יש לך חשבון?{' '}
+                <button 
+                  type="button" 
+                  onClick={() => { setAuthMode('login'); setAuthError(''); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--sport-volt)', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline', padding: 0 }}
+                >
+                  התחבר כאן
+                </button>
+              </span>
+            )}
+          </div>
         </div>
       </div>
     );

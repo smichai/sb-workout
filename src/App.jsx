@@ -1423,7 +1423,7 @@ function App() {
       <div className="auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '16px' }}>
         <div className="auth-card glass-panel" style={{ width: '100%', maxWidth: '380px', padding: '32px 24px', borderRadius: '24px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
           <div className="auth-logo" style={{ marginBottom: 20 }}>
-            <img src="/logo.jpg" alt="SB Sports Logo" className="logo-img" style={{ width: 80, height: 80, borderRadius: '50%', border: '2px solid var(--sport-volt)', objectFit: 'cover' }} />
+            <img src="/logo.jpg" alt="SB Sports Logo" className="logo-img" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover' }} />
           </div>
           <h1 className="auth-title text-gold-gradient" style={{ fontSize: '1.8rem', fontWeight: '900', margin: '0 0 4px' }}>SB SPORTS</h1>
           <p className="auth-subtitle" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 28 }}>
@@ -1650,7 +1650,7 @@ function App() {
       <div className="app-container" style={{ padding: '24px 16px', maxWidth: '600px', margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30, borderBottom: '1px solid var(--border-color)', paddingBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <img src="/logo.jpg" alt="Logo" style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid var(--sport-volt)' }} />
+            <img src="/logo.jpg" alt="Logo" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }} />
             <div>
               <h1 style={{ fontSize: '1.4rem', fontWeight: '900', color: '#fff', margin: 0 }}>פאנל מנהלים</h1>
               <span style={{ fontSize: '0.8rem', color: 'var(--sport-volt)', fontWeight: 'bold' }}>SB SPORTS ADMIN</span>

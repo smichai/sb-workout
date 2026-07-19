@@ -234,7 +234,7 @@ function App() {
   const [showFocusDetails, setShowFocusDetails] = useState(false);
 
   // Rest Timer State
-  const [restTimeTotal, setRestTimeTotal] = useState(90);
+  const [restTimeTotal, setRestTimeTotal] = useState(30);
   const [restTimeLeft, setRestTimeLeft] = useState(0);
   const [restIsActive, setRestIsActive] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -955,12 +955,25 @@ function App() {
     }
   };
 
+  const handleSkipPreWorkout = () => {
+    if (preWorkoutWarmupId) {
+      const warmupTpl = workouts.find(w => w.id === preWorkoutWarmupId);
+      if (warmupTpl) {
+        setNextWorkoutTemplate(preWorkoutTemplate);
+        startWorkoutSession(warmupTpl);
+      } else {
+        startWorkoutSession(preWorkoutTemplate);
+      }
+    } else {
+      startWorkoutSession(preWorkoutTemplate);
+    }
+    setShowPreWorkoutModal(false);
+    setPreWorkoutTemplate(null);
+    setPreWorkoutWarmupId('');
+  };
+
   const handlePreWorkoutSubmit = async (e) => {
     e.preventDefault();
-    if (!preWorkoutWeight) {
-      alert('אנא הזן משקל גוף');
-      return;
-    }
 
     const dateObj = showPreWorkoutCustomDate && preWorkoutCustomDate 
       ? new Date(preWorkoutCustomDate) 
@@ -969,7 +982,7 @@ function App() {
     
     const payload = {
       username: user.username,
-      weight: parseFloat(preWorkoutWeight),
+      weight: preWorkoutWeight ? parseFloat(preWorkoutWeight) : null,
       bodyFat: preWorkoutBodyFat ? parseFloat(preWorkoutBodyFat) : null,
       sleepQuality: parseInt(preWorkoutSleep),
       energyLevel: parseInt(preWorkoutEnergy),
@@ -1111,7 +1124,7 @@ function App() {
 
     // If set is completed, trigger the rest countdown timer automatically
     if (isNowCompleted) {
-      const restSec = nextWorkout.exercises[exIndex].restTime || 60;
+      const restSec = 30;
       startRestCountdown(restSec);
       setActiveSetDuration(0); // Reset set timer
       
@@ -3228,7 +3241,7 @@ function App() {
             
             <form onSubmit={handlePreWorkoutSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="auth-form-group" style={{ marginBottom: 0 }}>
-                <label className="auth-form-label" style={{ fontSize: '0.85rem' }}>משקל גוף נוכחי (ק״ג):</label>
+                <label className="auth-form-label" style={{ fontSize: '0.85rem' }}>משקל גוף נוכחי (ק״ג, אופציונלי):</label>
                 <input 
                   type="number" 
                   step="any"
@@ -3236,7 +3249,6 @@ function App() {
                   value={preWorkoutWeight} 
                   onChange={(e) => setPreWorkoutWeight(e.target.value)} 
                   placeholder="לדוגמה: 78.4"
-                  required
                   style={{ width: '100%' }}
                 />
               </div>
@@ -3398,6 +3410,14 @@ function App() {
                   }}
                 >
                   ביטול
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  style={{ color: 'var(--sport-volt)', border: '1px solid rgba(204, 255, 0, 0.2)' }}
+                  onClick={handleSkipPreWorkout}
+                >
+                  דלג והתחל אימון
                 </button>
                 <button type="submit" className="btn btn-gold">
                   🚀 שמור והתחל אימון

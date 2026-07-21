@@ -11,6 +11,7 @@ import {
   Plus,
   Trash,
   Play,
+  Pause,
   Check,
   LogOut,
   Volume2,
@@ -232,6 +233,13 @@ function App() {
   const [guidedMode, setGuidedMode] = useState(true); // Sequential single set focus
   const [activeSetDuration, setActiveSetDuration] = useState(0);
   const [showFocusDetails, setShowFocusDetails] = useState(false);
+  const [isWorkoutPaused, setIsWorkoutPaused] = useState(false);
+  const [showAddExerciseModal, setShowAddExerciseModal] = useState(false);
+  const [newExName, setNewExName] = useState('');
+  const [newExSetsCount, setNewExSetsCount] = useState(3);
+  const [newExReps, setNewExReps] = useState('10');
+  const [newExWeight, setNewExWeight] = useState(0);
+  const [newExRest, setNewExRest] = useState(30);
 
   // Rest Timer State
   const [restTimeTotal, setRestTimeTotal] = useState(30);
@@ -275,6 +283,11 @@ function App() {
   // Refs for Timers
   const stopwatchIntervalRef = useRef(null);
   const restTimerIntervalRef = useRef(null);
+  const isWorkoutPausedRef = useRef(false);
+
+  useEffect(() => {
+    isWorkoutPausedRef.current = isWorkoutPaused;
+  }, [isWorkoutPaused]);
 
   const myWorkouts = workouts.filter(w => w.createdBy === user?.username && (w.type === 'workout' || !w.type));
   const myWarmups = workouts.filter(w => w.createdBy === user?.username && w.type === 'warmup');
@@ -870,9 +883,13 @@ function App() {
     setActiveSetDuration(0);
     setShowFocusDetails(false);
 
+    setIsWorkoutPaused(false);
+
     // Start global stopwatch
     if (stopwatchIntervalRef.current) clearInterval(stopwatchIntervalRef.current);
     stopwatchIntervalRef.current = setInterval(() => {
+      if (isWorkoutPausedRef.current) return; // Skip if paused
+
       setActiveWorkout(prev => {
         if (!prev) return null;
         return {
@@ -1183,6 +1200,8 @@ function App() {
     setRestIsActive(true);
 
     restTimerIntervalRef.current = setInterval(() => {
+      if (isWorkoutPausedRef.current) return; // Skip if paused
+
       setRestTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(restTimerIntervalRef.current);
@@ -1205,6 +1224,8 @@ function App() {
       } else {
         setRestIsActive(true);
         restTimerIntervalRef.current = setInterval(() => {
+          if (isWorkoutPausedRef.current) return; // Skip if paused
+
           setRestTimeLeft(prev => {
             if (prev <= 1) {
               clearInterval(restTimerIntervalRef.current);
@@ -1360,6 +1381,34 @@ function App() {
     clearInterval(restTimerIntervalRef.current);
     setActiveWorkout(null);
     setCurrentTab('dashboard');
+  };
+
+  const handleAddExerciseToActiveWorkout = (name, setsCount, reps, weight, restTime) => {
+    if (!activeWorkout) return;
+    
+    const sets = [];
+    for (let i = 1; i <= setsCount; i++) {
+      sets.push({
+        setNum: i,
+        reps: reps || '10',
+        weight: parseFloat(weight) || 0,
+        completed: false,
+        type: 'normal'
+      });
+    }
+
+    const newEx = {
+      name: name || 'תרגיל חדש',
+      type: 'workout',
+      isSuperset: false,
+      subExercises: [],
+      restTime: parseInt(restTime) || 30,
+      sets
+    };
+
+    const nextWorkout = { ...activeWorkout };
+    nextWorkout.exercises = [...nextWorkout.exercises, newEx];
+    setActiveWorkout(nextWorkout);
   };
 
   // History Log Functions
@@ -1826,14 +1875,75 @@ function App() {
                   /* Rest Mode Minimal Display */
                   <div style={{ background: 'rgba(255, 90, 95, 0.04)', border: '1px solid rgba(255, 90, 95, 0.15)', borderRadius: '16px', padding: '20px 16px', textAlign: 'center', marginBottom: 20 }}>
                     <span style={{ fontSize: '0.75rem', color: 'var(--sport-orange)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold', display: 'block', marginBottom: 4 }}>זמן מנוחה פעיל</span>
-                    <div style={{ fontSize: '3rem', fontWeight: '900', color: 'var(--sport-orange)', fontFamily: 'var(--font-latin)', lineHeight: '100%' }}>
+                    <div style={{ fontSize: '3rem', fontWeight: '900', color: 'var(--sport-orange)', fontFamily: 'var(--font-latin)', lineHeight: '100%', marginBottom: 8 }}>
                       {restTimeLeft} <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>ש'</span>
                     </div>
+                    
+                    <button 
+                      type="button" 
+                      onClick={() => setIsWorkoutPaused(!isWorkoutPaused)}
+                      style={{
+                        margin: '0 auto',
+                        padding: '6px 14px',
+                        borderRadius: '9999px',
+                        border: '1px solid ' + (isWorkoutPaused ? 'var(--sport-volt)' : 'rgba(255,255,255,0.1)'),
+                        background: isWorkoutPaused ? 'rgba(204, 255, 0, 0.1)' : 'rgba(255,255,255,0.02)',
+                        color: isWorkoutPaused ? 'var(--sport-volt)' : 'var(--text-secondary)',
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {isWorkoutPaused ? (
+                        <>
+                          <Play size={10} fill="var(--sport-volt)" />
+                          <span>המשך מנוחה</span>
+                        </>
+                      ) : (
+                        <>
+                          <Pause size={10} fill="var(--text-secondary)" />
+                          <span>השהה מנוחה</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 ) : (
                   /* Training Mode Minimal Stopwatch Display */
-                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '20px', marginBottom: 20 }}>
-                    <span style={{ fontSize: '2.2rem', fontWeight: '900', color: 'var(--sport-volt)', fontFamily: 'var(--font-latin)' }}>{formatTime(activeSetDuration)}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '20px', marginBottom: 20 }}>
+                    <span style={{ fontSize: '2.2rem', fontWeight: '900', color: 'var(--sport-volt)', fontFamily: 'var(--font-latin)', marginBottom: 8 }}>{formatTime(activeSetDuration)}</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsWorkoutPaused(!isWorkoutPaused)}
+                      style={{
+                        padding: '6px 16px',
+                        borderRadius: '9999px',
+                        border: '1px solid ' + (isWorkoutPaused ? 'var(--sport-volt)' : 'rgba(255,255,255,0.15)'),
+                        background: isWorkoutPaused ? 'rgba(204, 255, 0, 0.1)' : 'rgba(255,255,255,0.02)',
+                        color: isWorkoutPaused ? 'var(--sport-volt)' : 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                    >
+                      {isWorkoutPaused ? (
+                        <>
+                          <Play size={12} fill="var(--sport-volt)" />
+                          <span>המשך אימון</span>
+                        </>
+                      ) : (
+                        <>
+                          <Pause size={12} fill="var(--text-secondary)" />
+                          <span>השהה אימון</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 )}
 
@@ -1850,6 +1960,7 @@ function App() {
                 {/* Action button */}
                 {isResting ? (
                   <button 
+                    type="button"
                     className="guided-btn-done" 
                     style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--sport-volt)', color: 'var(--sport-volt)', margin: '0 auto' }}
                     onClick={() => {
@@ -1862,6 +1973,7 @@ function App() {
                   </button>
                 ) : (
                   <button 
+                    type="button"
                     className="guided-btn-done" 
                     onClick={() => toggleSetCompletion(activeExerciseIndex, activeSetIndex)}
                     style={{ margin: '0 auto' }}
@@ -1869,6 +1981,125 @@ function App() {
                     👍 סיימתי את הסט!
                   </button>
                 )}
+
+                {/* Active Set Adjuster panel */}
+                {!isResting && (
+                  <div style={{ marginTop: 24, padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', direction: 'rtl' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--sport-volt)' }}>🔧 התאמת הסט הנוכחי (סט {activeSetIndex + 1})</span>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                      {/* Reps */}
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>חזרות לסט:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <button 
+                            type="button" 
+                            onClick={() => adjustSetValues(activeExerciseIndex, activeSetIndex, 'reps', -1)}
+                            style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                          >
+                            -
+                          </button>
+                          <input 
+                            type="text" 
+                            value={currentEx.sets[activeSetIndex]?.reps || '10'} 
+                            onChange={(e) => updateSetInput(activeExerciseIndex, activeSetIndex, 'reps', e.target.value)}
+                            style={{ flex: 1, width: '40px', padding: '4px', textAlign: 'center', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', fontWeight: 'bold' }}
+                          />
+                          <button 
+                            type="button" 
+                            onClick={() => adjustSetValues(activeExerciseIndex, activeSetIndex, 'reps', 1)}
+                            style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Weight */}
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>משקל לסט (ק״ג):</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <button 
+                            type="button" 
+                            onClick={() => adjustSetValues(activeExerciseIndex, activeSetIndex, 'weight', -2.5)}
+                            style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                          >
+                            -
+                          </button>
+                          <input 
+                            type="text" 
+                            value={currentEx.sets[activeSetIndex]?.weight ?? '0'} 
+                            onChange={(e) => updateSetInput(activeExerciseIndex, activeSetIndex, 'weight', e.target.value)}
+                            style={{ flex: 1, width: '40px', padding: '4px', textAlign: 'center', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', fontWeight: 'bold' }}
+                          />
+                          <button 
+                            type="button" 
+                            onClick={() => adjustSetValues(activeExerciseIndex, activeSetIndex, 'weight', 2.5)}
+                            style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Rest Time modifier for current exercise */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12 }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>זמן הפסקה לתרגיל זה:</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            const nextWorkout = { ...activeWorkout };
+                            nextWorkout.exercises[activeExerciseIndex].restTime = Math.max(15, (currentEx.restTime || 30) - 15);
+                            setActiveWorkout(nextWorkout);
+                          }}
+                          style={{ padding: '3px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)', color: '#fff', fontSize: '0.75rem', cursor: 'pointer' }}
+                        >
+                          -15 ש'
+                        </button>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--sport-volt)', fontFamily: 'var(--font-latin)' }}>{currentEx.restTime || 30} ש'</span>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            const nextWorkout = { ...activeWorkout };
+                            nextWorkout.exercises[activeExerciseIndex].restTime = (currentEx.restTime || 30) + 15;
+                            setActiveWorkout(nextWorkout);
+                          }}
+                          style={{ padding: '3px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)', color: '#fff', fontSize: '0.75rem', cursor: 'pointer' }}
+                        >
+                          +15 ש'
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Custom Exercise Button */}
+                <div style={{ textAlign: 'center', marginTop: 16 }}>
+                  <button 
+                    type="button"
+                    onClick={() => setShowAddExerciseModal(true)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '12px',
+                      border: '1px dashed var(--sport-volt)',
+                      background: 'rgba(204, 255, 0, 0.03)',
+                      color: 'var(--sport-volt)',
+                      fontSize: '0.85rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6
+                    }}
+                  >
+                    <Plus size={14} />
+                    <span>הוסף תרגיל שלא היה רשום</span>
+                  </button>
+                </div>
 
                 {/* Quick Manual navigation */}
                 <div className="guided-quick-navigation" style={{ margin: '16px auto 0', maxWidth: '320px' }}>
@@ -3424,6 +3655,131 @@ function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Exercise During Workout Modal Overlay */}
+      {showAddExerciseModal && (
+        <div className="modal-overlay" style={{ display: 'flex', direction: 'rtl', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 9999, alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div className="modal-card glass-panel" style={{ maxWidth: '400px', width: '100%', padding: '24px', borderRadius: '24px', border: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
+            <h2 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 12px', fontSize: '1.3rem', color: 'var(--sport-volt)' }}>
+              ➕ הוספת תרגיל חדש לאימון
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: 20 }}>
+              הקלד את שם התרגיל או בחר מרשימת הנפוצים, וקבע את כמות הסטים והמשקל הראשוני.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Exercise Name Input with presets selector */}
+              <div style={{ textAlign: 'right' }}>
+                <label className="auth-form-label" style={{ fontSize: '0.85rem' }}>שם התרגיל:</label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={newExName} 
+                    onChange={(e) => setNewExName(e.target.value)} 
+                    placeholder="הקלד שם תרגיל (למשל: כפיפות בטן)"
+                    style={{ width: '100%' }}
+                  />
+                  {/* Preset Quick Select list */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    {PRESET_EXERCISES.slice(0, 6).map(preset => (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => {
+                          setNewExName(preset.name.split(' (')[0]);
+                          setNewExRest(preset.restTime || 30);
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid var(--border-color)',
+                          color: '#fff',
+                          fontSize: '0.72rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {preset.name.split(' (')[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid for Sets, Reps, Weight, Rest */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ textAlign: 'right' }}>
+                  <label className="auth-form-label" style={{ fontSize: '0.85rem' }}>כמות סטים:</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    value={newExSetsCount} 
+                    onChange={(e) => setNewExSetsCount(parseInt(e.target.value) || 1)} 
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <label className="auth-form-label" style={{ fontSize: '0.85rem' }}>חזרות לסט:</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={newExReps} 
+                    onChange={(e) => setNewExReps(e.target.value)} 
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <label className="auth-form-label" style={{ fontSize: '0.85rem' }}>משקל התחלתי (ק״ג):</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    value={newExWeight} 
+                    onChange={(e) => setNewExWeight(parseFloat(e.target.value) || 0)} 
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <label className="auth-form-label" style={{ fontSize: '0.85rem' }}>זמן מנוחה (שניות):</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    value={newExRest} 
+                    onChange={(e) => setNewExRest(parseInt(e.target.value) || 30)} 
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => {
+                    setShowAddExerciseModal(false);
+                    setNewExName('');
+                  }}
+                >
+                  ביטול
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-gold" 
+                  disabled={!newExName.trim()}
+                  onClick={() => {
+                    handleAddExerciseToActiveWorkout(newExName, newExSetsCount, newExReps, newExWeight, newExRest);
+                    setShowAddExerciseModal(false);
+                    setNewExName('');
+                  }}
+                >
+                  🚀 הוסף תרגיל
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
